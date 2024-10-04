@@ -21,7 +21,6 @@ To get started, clone the repository to your local machine using the following c
 ```bash
 git clone https://github.com/your-username/AppleHealthAI.git
 ```
-
 ### Step 2: Set Up the Environment
 
 Navigate into the project directory:
