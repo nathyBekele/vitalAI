@@ -1,0 +1,16 @@
+# Django/Python-specific files
+*.pyc
+__pycache__/
+db.sqlite3
+*.log
+
+# Environments
+env/
+venv/
+*.env
+
+# Static files
+staticfiles/
+
+# VSCode project files
+.vscode/
