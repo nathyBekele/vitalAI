@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
-class AppleHealthStat(models.Model):  # Removed the TimestampedModel for simplicity, but you can add it back if needed
+class AppleHealthStat(models.Model):
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='apple_health_stat')
     dateOfBirth = models.DateTimeField(null=True, blank=True)
     height = models.PositiveSmallIntegerField(null=True, blank=True)
