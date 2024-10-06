@@ -5,27 +5,27 @@ from api.models import AppleHealthStat
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from gpt.generate_ai_response import generate_ai_response 
+from rest_framework.permissions import AllowAny
+from gpt.generate_ai_response import generate_ai_response
 
 
 def get_users_with_bad_sleep():
     one_week_ago = timezone.now() - timedelta(days=7)
-    bad_sleep_users = []
-    
     users = User.objects.all()
+    bad_sleep_users = []
 
-    for user in users:
+    for user in users[:1]:
         total_sleep = 0
-        stats = AppleHealthStat.objects.filter(user=user, created_at__gte=one_week_ago)
 
+        stats = AppleHealthStat.objects.filter(user=user, created_at__gte=one_week_ago)
         for stat in stats:
-            sleep_periods = stat.sleep_analysis or []
+            sleep_periods = stat.sleepAnalysis or []
             for period in sleep_periods:
+                # print(period.get("sleep_time", 0))
                 total_sleep += period.get("sleep_time", 0)
 
-        # Total sleep should be less than 6 hours (6*3600 = 21600)
-        if total_sleep < 21600:
+        # print(user.username, total_sleep)
+        if total_sleep < 300000:  # 6 hours = 21600 seconds
             bad_sleep_users.append(user)
 
     return bad_sleep_users
@@ -33,16 +33,27 @@ def get_users_with_bad_sleep():
 
 def get_users_with_10k_steps():
     today = timezone.now().date()
-    return User.objects.filter(
-        apple_health_stat__created_at__date=today
-    ).annotate(steps=Sum('apple_health_stat__step_count')).filter(steps__gte=10000)
+    users = User.objects.all()
+    step_users = []
+
+    for user in users:
+        total_steps_today = AppleHealthStat.objects.filter(
+            user=user, created_at__date=today
+        ).aggregate(total_steps=Sum('stepCount'))['total_steps'] or 0
+
+
+        if total_steps_today >= 10000:
+            step_users.append(user)
+
+    return step_users
+
 
 
 def get_users_with_step_drop():
     today = timezone.now().date()
-    this_week_start = today - timedelta(days=today.weekday())  
-    last_week_start = this_week_start - timedelta(days=7)      
-    last_week_end = this_week_start - timedelta(days=1)       
+    this_week_start = today - timedelta(days=today.weekday())  # Start of this week
+    last_week_start = this_week_start - timedelta(days=7)      # Start of last week
+    last_week_end = this_week_start - timedelta(days=1)        # End of last week
 
     users = User.objects.all()
     step_drop_users = []
@@ -50,34 +61,34 @@ def get_users_with_step_drop():
     for user in users:
         this_week_steps = AppleHealthStat.objects.filter(
             user=user, created_at__gte=this_week_start
-        ).aggregate(total_steps=Sum('step_count'))['total_steps'] or 0
+        ).aggregate(total_steps=Sum('stepCount'))['total_steps'] or 0
 
         last_week_steps = AppleHealthStat.objects.filter(
             user=user, created_at__range=(last_week_start, last_week_end)
-        ).aggregate(total_steps=Sum('step_count'))['total_steps'] or 0
+        ).aggregate(total_steps=Sum('stepCount'))['total_steps'] or 0
 
         if last_week_steps > 0 and this_week_steps < (0.5 * last_week_steps):
             step_drop_users.append(user)
 
+    print("step_drop_users", len(step_drop_users))
     return step_drop_users
 
+
 class SleepConditionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         users = get_users_with_bad_sleep()
         responses = []
         one_week_ago = timezone.now() - timedelta(days=7)
 
-        # print("Total Users from SleepCondition", len(users))
-        
         for user in users:
             total_sleep = 0
             days_with_less_than_6_hours = 0
 
             stats = AppleHealthStat.objects.filter(user=user, created_at__gte=one_week_ago)
             for stat in stats:
-                sleep_periods = stat.sleep_analysis or []
+                sleep_periods = stat.sleepAnalysis or []
                 for period in sleep_periods:
                     sleep_time = period.get("sleep_time", 0)
                     total_sleep += sleep_time
@@ -93,29 +104,37 @@ class SleepConditionView(APIView):
             }
 
             ai_response = generate_ai_response(user, data)
+
+            # print(user.username, ai_response)
             responses.append({"user": user.username, "ai_response": ai_response})
 
         return Response(responses)
 
 
 class StepsCondition1View(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         users = get_users_with_10k_steps()
         responses = []
         today = timezone.now().date()
+        yesterday = today - timedelta(days=1)
 
-        # print("Total Users from stepsCondition1", len(users))
-
+        # print("Users", len(users))
         for user in users:
-            total_steps_today = AppleHealthStat.objects.filter(
-                user=user, created_at__date=today
-            ).aggregate(total_steps=Sum('step_count'))['total_steps'] or 0
+            steps_data = AppleHealthStat.objects.filter(
+                user=user, created_at__date__in=[today, yesterday]
+            ).values('created_at__date').annotate(
+                total_steps=Sum('stepCount')
+            )
 
-            total_steps_yesterday = AppleHealthStat.objects.filter(
-                user=user, created_at__date=today - timedelta(days=1)
-            ).aggregate(total_steps=Sum('step_count'))['total_steps'] or 0
+            total_steps_today, total_steps_yesterday = 0, 0
+
+            for data in steps_data:
+                if data['created_at__date'] == today:
+                    total_steps_today = data['total_steps']
+                elif data['created_at__date'] == yesterday:
+                    total_steps_yesterday = data['total_steps']
 
             comparison_to_average = total_steps_today - total_steps_yesterday
 
@@ -132,26 +151,24 @@ class StepsCondition1View(APIView):
 
 
 class StepsCondition2View(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         users = get_users_with_step_drop()
         responses = []
-        today = timezone.now().date()
-        this_week_start = today - timedelta(days=today.weekday())  # Start of this week
-        last_week_start = this_week_start - timedelta(days=7)
-        last_week_end = this_week_start - timedelta(days=1)
-
-        # print("Total Users from stepsConditions2", len(users))
+        this_week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())  # Start of this week
 
         for user in users:
             this_week_steps = AppleHealthStat.objects.filter(
                 user=user, created_at__gte=this_week_start
-            ).aggregate(total_steps=Sum('step_count'))['total_steps'] or 0
+            ).aggregate(total_steps=Sum('stepCount'))['total_steps'] or 0
+
+            last_week_start = this_week_start - timedelta(days=7)
+            last_week_end = this_week_start - timedelta(days=1)
 
             last_week_steps = AppleHealthStat.objects.filter(
                 user=user, created_at__range=(last_week_start, last_week_end)
-            ).aggregate(total_steps=Sum('step_count'))['total_steps'] or 0
+            ).aggregate(total_steps=Sum('stepCount'))['total_steps'] or 0
 
             percentage_step_drop = (last_week_steps - this_week_steps) / last_week_steps * 100 if last_week_steps else 0
 
@@ -166,4 +183,3 @@ class StepsCondition2View(APIView):
             responses.append({"user": user.username, "ai_response": ai_response})
 
         return Response(responses)
-
