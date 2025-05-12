@@ -1,8 +1,8 @@
-# AppleHealthAI
+# vital-ai
 
 ## 1. What the Project Is
 
-**AppleHealthAI** is a Django-based project that integrates with OpenAI to provide personalized health advice to users based on their Apple Health data. The platform generates recommendations for users based on their sleep patterns, physical activity, and other health metrics. The project uses OpenAI's GPT models to generate these personalized responses, and it features an API that allows users to access health advice in real-time.
+**vital-ai** is a Django-based project that integrates with OpenAI to provide personalized health advice to users based on their Apple Health data. The platform generates recommendations for users based on their sleep patterns, physical activity, and other health metrics. The project uses OpenAI's GPT models to generate these personalized responses, and it features an API that allows users to access health advice in real-time.
 
 ### Key Features:
 - **Health Data Insights**: Users' Apple Health data is analyzed to provide insights and advice.
@@ -19,14 +19,14 @@
 To get started, clone the repository to your local machine using the following command:
 
 ```bash
-git clone https://github.com/your-username/AppleHealthAI.git
+git clone https://github.com/your-username/vital-ai.git
 ```
 ### Step 2: Set Up the Environment
 
 Navigate into the project directory:
 
 ```bash
-cd AppleHealthAI
+cd vital-ai
 ```
 
 Install Python dependencies using pip. It is recommended to create a virtual environment first:
