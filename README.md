@@ -1,4 +1,4 @@
-# vital-ai
+vital-ai
 
 ## 1. What the Project Is
 
